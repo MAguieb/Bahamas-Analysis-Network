@@ -1,18 +1,12 @@
-
-# --------------------------------------- Analyse des Réeseaux sociaux ----------------------------------------- # 
-
-#  problematique : 
-
-# Using Social Network Analysis techniques was possible to
-# characterize the level of connections, the number of communities and
-# the actors that play a central role in the network. We were able to assess
-# the Bahamas network and identify its central actors of the network,
-# i.e., companies with high influence in the network, in which any eventual
-# investigation of legal compliance by Bahamas authorities should be focused on
-
-
 rm(list=ls())
+# ---------------------------------------  Analysis of social networks ----------------------------------------- # 
 
+#  Introduction : 
+
+# Using Social Network Analysis techniques was possible to characterize the level of connections, the number of communities and
+# the actors that play a central role in the network. We were able to assess the Bahamas network and identify its central actors 
+# of the network, i.e., companies with high influence in the network, in which any eventual
+# investigation of legal compliance by Bahamas authorities should be focused on;
 
 # packages & library :
 
@@ -73,8 +67,6 @@ require(networkD3)
 
 #  Let’s read the data in and look at the columns :
 
-setwd ("C:/Users/Admin/Desktop/Analyse_des_réseaux_Sociaux/PROJET")
-
 Entity <- as.data.table(read.csv("bahamas_leaks_nodes_entity.csv",na.strings=c("","NA"),stringsAsFactors = FALSE))
 
 Address <- as.data.table(read.csv("bahamas_leaks_nodes_address.csv",na.strings=c("","NA"),stringsAsFactors = FALSE))
@@ -85,35 +77,32 @@ Officer <- as.data.table(read.csv("bahamas_leaks_nodes_officer.csv",na.strings=c
 
 Edges <- as.data.table(read.csv("bahamas_leaks_edges.csv",na.strings=c("","NA"), stringsAsFactors = FALSE))
 
-# overview of datasets and some retraitement:
+### ## ## ## ### Overview of datasets and some retraitement:
 
 # ”Entity (offshore)”: company, trust or fund created in a low-tax, offshore jurisdiction by an agent.
-
 # ”Officer”: person or company who plays a role in an offshore entity.
-
 # ”Intermediary”: a go-between for someone seeking an offshore corporation and an offshore service provider 
 #  usually a law-firm or a middleman that asks an offshore service provider to create an offshore firm for a client.
-
 # ”Address”: contact postal address as it appears in the original databases obtained by ICIJ.
 
 
-# ________________ Analyse et traitement de chaque data set 
+#### ## ## ## ##  Analysis and treatment of each data set 
 
 # Entity :
 
-# Traitement de la colone date 
+# Date column treatement
 
 glimpse(Entity)
 
 Entity[,("incorporation_date"):=lapply(.SD,parse_date_time,orders="%d-%m-%Y"), .SDcols="incorporation_date"]
 
-# Traitement des NA 
+# NA treatement 
 
 Entity <-Entity[,-c("country_codes","countries","address","service_provider","closed_date","type","status","company_type","note")]
 
 glimpse(Entity)
 
-# Entities incorporation date by Year and Month By year :
+# Entities incorporation Date by Year and Month By year :
 
 ggplot(Entity[,.N,keyby=.(incorporation_date,year(incorporation_date),month(incorporation_date,label=T))][year>1990&year<2017],
        aes(x=month,y=N,fill=incorporation_date))+
@@ -165,7 +154,7 @@ Officer<-Officer[,-c("country_codes","countries","address","jurisdiction_descrip
 
 glimpse(Officer)
 
-# Comptage des nom les plus utilisé dans les bahamas officer
+# Counting of the most popular names in Bahamas officer
 
 corpus = Corpus(VectorSource(list(Officer$name)))
 corpus = tm_map(corpus, removePunctuation)
@@ -182,19 +171,19 @@ frec$word <- names(freq_eap)
 frec$freq <- freq_eap
 wordcloud(frec$word,frec$freq , min.freq=50,colors=brewer.pal(6,"Dark2"),random.order = F)
 
-# table de frequence name :
+# Frequency Table name :
 
 DT::datatable(as.data.table(frec)[order(-freq)][1:50])
 
 # Edges
 
-glimpse(Edges)
+# glimpse(Edges)
 
 Edges<-Edges[,-c("start_date","end_date")]                
 
-glimpse(Edges)
+# glimpse(Edges)
 
-# voir le type de relation les plus dominant entre les noueds :
+# The most dominant relationship between Nodes 
 
 popular_rel_type<-Edges[,.N, by=c("rel_type")] %>%
   .[order(-N)] 
@@ -223,10 +212,10 @@ hchart(popular_rel_type, "column", hcaes(x = rel_type, y = N, group = Edge_Type)
   hc_title(text = "Top 10 Nodes relationship between the nodes ID",
            style = list(color = "Black", useHTML = TRUE)) 
 
-
-#  voir les network relationshep 
+# ----------------------------------------- The Networks relationship ------------------------------------------------ #
 
 #  Nodes
+
 Nodes<-rbind(
   Entity[,.(node_id,nameID=name,Identity="Entities")], 
   Intermediary[,.(node_id, nameID=name, Identity="Intermediaries")], 
@@ -250,10 +239,9 @@ net <- graph.data.frame(Edges_simplified, vertices=Nodes, directed=T)
 
 net
 
-class(net)  
-#  faire un plot est impossible vu la taille des données et 
+class(net)  # To make a plot is impossible given the size of the data 
 
-# degre des noeux 
+# degree of nodes
 
 nodes_attributes<-data.table(
   node_id=names(igraph::degree(net, mode = "all")), 
@@ -262,12 +250,13 @@ nodes_attributes<-data.table(
   nodes_betweenness=(igraph::betweenness(net)),
   centrality=(eigen_centrality(net)$vector))
 
+DT::datatable(nodes_attributes)
 
 # Clustering
 
 clusters(net)
 
-# voir les clusters les plus grands 
+# The biggest clusters
 
 decomposed_graph_list <- decompose.graph(net)
 
@@ -283,18 +272,14 @@ hchart(Pop_list,"column",hcaes(x = cluster_id, y=vCOUNT)) %>%
   hc_yAxis(type="logarithmic")
 
 
- # etudes des nodes 
+# Explore Nodes 
 
-# Exploring centrality
+# centrality
 
 High_Centrality_Nodes<-nodes_attributes[centrality>=0.002681][order(-centrality)]%>%head(30)
 
-# # Changing the class of nodes_id to interget for Merging
- 
 High_Centrality_Nodes$node_id<- as.integer(High_Centrality_Nodes$node_id)
 
-# # Merging with original nodes to acquire nodes attributes
- 
 H_Centrality_dt <- merge(High_Centrality_Nodes,Nodes,by="node_id",all=FALSE)
 
 H_Centrality_dt[,.(nameID,Identity, node_id, address)]
@@ -302,8 +287,7 @@ H_Centrality_dt[,.(nameID,Identity, node_id, address)]
 DT::datatable(as.data.table(H_Centrality_dt))
 
 
-#  etudes des degrees 
-
+# Explore degrees 
 
 High_Degree_Nodes<-nodes_attributes[order(-nodes_degree_all)]%>%head(30)
 
@@ -316,16 +300,11 @@ H_Degree_dt[,.(nameID, nodes_degree_all, Identity, node_id, address)]
 DT::datatable(as.data.table(H_Degree_dt))
 
 
-#  on fabrique des reseaux a partir de la base edges en fesant des group_by 
- #  voir les Nodes Entity 
- 
+# ----------------------------- Making a Network--------------------------- #
+
 table(Edges_simplified$type_rel)
  
-Edges_off <- Edges_simplified %>% filter(type_rel=='registered_address')
-
-# ed_off=data.frame(node_id=unique((unlist(Edges_off[,c("from",'to')]))))
-# 
-# Nodes_off <- merge(ed_off,Nodes,by="node_id",all=TRUE)
+Edges_off <- Edges_simplified %>% filter(type_rel=="registered_address")
 
 Edg_RA <- data.frame(Edges_off[Edges_off$from %in% Nodes$node_id ,])
 Edg_RA <- data.frame(Edges_off[Edges_off$to %in% Nodes$node_id ,])
@@ -334,54 +313,76 @@ ed_ra=data.frame(node_id=unique((unlist(Edg_RA[,c("from",'to')]))))
 
 Node_RA <- merge(ed_ra,Nodes,by="node_id",all=FALSE)
 
-nrow(Node_RA)
-
-
-nett <- graph.data.frame(Edg_RA, vertices=Node_RA, directed=T)
+nett <- graph.data.frame(Edg_RA, vertices=Node_RA, directed=F)
 
 nett
 
 class(nett)
 
-plot(nett)
-
-#  VISUALISATION Graphs KK
+# Graphic Visualization :
 
 hchart(nett, layout=layout_with_kk)%>%
   hc_title(text="Network Attributes of Bahamas Leaks")
 
-hchart(nett, layout=layout.reingold.tilford)%>%
+
+hchart(nett, layout=layout.random)%>%
   hc_title(text="Network Attributes of Bahamas Leaks")
 
-# #  graphe par type de node 
-# 
-# Edg_Entity <- data.frame(Edges_simplified[Edges_simplified$node_2 %in% Entity$node_id ,])
-# Edg_Entity <- data.frame(Edges_simplified[Edges_simplified$node_1 %in% Entity$node_id ,])
-# 
-# ed1=data.frame(node_id=unique((unlist(Edg_Entity[,c("node_1",'node_2')]))))
-# 
-# Node_Enity <- merge(ed1,Entity,by="node_id",all=TRUE)
-# 
-# nrow(Node_Enity)
-# 
-# #transformer les networks en igraphs objets
-# 
-# net <- graph_from_data_frame(d=Edg_Entity, vertices=EEEE, directed=T) 
-# 
-# Entity[, -c("labels.n.","valid_until","sourceID","jurisdiction_description","jurisdiction")]
-# 
-# E(net)
-# 
-# V(net)
-# 
-# net
-# 
-# plot(net, vertex.label=NA)
-# 
-# hchart(net, layout=layout_with_kk)%>%
-#   hc_title(text="Network Attributes of Country Nodes in panama-paradise papers")
-# 
-# 
-# visNetwork(edges = Edg_Entity, nodes = EEEE ,main = 'ldkg') %>% 
-#   visOptions(highlightNearest = TRUE)
-# 
+#  Some stats :
+
+Nodes_attributs<-data.table(
+  node_id=names(igraph::degree(net, mode = "all")), 
+  nodes_degree_all=(igraph::degree(net, mode = "all")), 
+  nodes_degree_out=(igraph::degree(net, mode = "out")), 
+  nodes_betweenness=(igraph::betweenness(net)),
+  centrality=(eigen_centrality(net)$vector))
+
+# Distance
+mean_distance(nett, directed=F)
+
+# Density
+edge_density(nett, loops=F)
+ecount(nett)/(vcount(nett)*(vcount(nett)-1)) #for a directed network
+
+# transivity
+transitivity(nett, type="global")  # net is treated as an undirected network
+transitivity(as.undirected(nett, mode="collapse")) # same as above
+transitivity(nett, type="local")
+
+# Clustering
+
+clusters(nett)
+
+# Community detection algorithms :
+
+set.seed(123)
+decomposed_graph <- decompose.graph(nett)
+# giant <- decomposed_graph[[70]]
+
+## fast and greedy method 
+
+comm1 <- cluster_fast_greedy(nett)
+modularity(comm1)
+# p1 <- plot(comm1,nett, main="Fast and greedy")
+dendPlot(comm1)
+
+## Walktrap algorithme
+comm2 <- cluster_walktrap(nett)
+modularity(comm2)
+# p2 <- plot(comm2, nett, main="Walktrap algorithm")
+
+## Infomap 
+comm3 <- cluster_infomap(nett)
+modularity(comm3)
+# p3 <- plot(comm3, nett, main="Infomap")
+
+## Edge-betweenness 
+comm4 <- cluster_edge_betweenness(nett)
+modularity(comm4)
+# p4 <- plot(comm4, nett, main="Edge-betweenness")
+
+## label propagation
+comm5 <- cluster_label_prop(nett)
+modularity(comm5)
+# p5 <- plot(comm5, nett, main="Label propagation")
+
